@@ -1,3 +1,4 @@
+from connect_with_db import Tasks
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
