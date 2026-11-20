@@ -2,13 +2,16 @@ import os
 import connect_with_db as db
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
 
-app = FastAPI()
-
-if not os.path.exists("tasks.db"):
+@asynccontextmanager
+async def lifespan(app:FastAPI):
     db.create_db_and_tables()
     db.count_rows()
-db.count_rows()
+    yield
+
+app = FastAPI(lifespan=lifespan)
+
 
 class TaskCreate(BaseModel):
     title : str | None = None
@@ -19,7 +22,6 @@ task_objects = [
     { "id" : 3 , "title" : "eat breakfast" , "done" : True}
 ]
 
-    
 
 @app.get("/")
 async def root():
@@ -41,12 +43,17 @@ async def tasks_id(id : int):
     raise HTTPException(status_code=404, detail = f"item {id} not found")
 
 @app.post("/tasks", status_code=201)
-async def add_task(task : TaskCreate, done :bool |None= None):
-    if task.title is None or not task.title.strip():
+async def add_task(task : str| None , done:bool|None=False):
+    id_list=[]
+    for t in db.list_tasks():
+        id_list.append(t.id)
+    last_id = max(id_list, default=0)
+    if task is None or not task.strip():
          raise HTTPException(status_code=400, detail = "Title cannot be empty" )
     else:
-        return db.create_tasks(task.title, done)
-            
+        new_id = last_id+1
+        new_task=db.Tasks(id=new_id, title=task,done=done)
+        return db.create_tasks(new_task)
 
 @app.put("/tasks/{id}")
 async def update_task(id: int, title: str|None = None, done: bool | None = None):
@@ -60,7 +67,9 @@ async def update_task(id: int, title: str|None = None, done: bool | None = None)
 
 @app.delete("/task/{id}", status_code=204)
 async def delete_task(id: int):
+    id_list=[]
     for task in db.list_tasks():
-        if task.id == id:
-            db.delete_tasks(id)
-    raise HTTPException(status_code=404, detail= f"task {id} is not found")
+        id_list.append(task.id)
+    if id not in id_list:
+        raise HTTPException(status_code=404, detail= f"task {id} is not found")
+    db.delete_tasks(id)

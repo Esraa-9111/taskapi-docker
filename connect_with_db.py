@@ -16,31 +16,25 @@ engine = create_engine(dburl, echo=True)
 def create_db_and_tables():  
     SQLModel.metadata.create_all(engine) 
 
-def create_tasks(titlex :str | None = None, donex:bool|None=None):
-    task_1=Tasks(title="untitled 4")
-    task_2=Tasks(title="untitled 5")
-    task_3=Tasks(title="untitled 6")
-
+def create_tasks(task :Tasks):
     with Session(engine) as session:
-        if titlex is None:
-            session.add(task_1)
-            session.add(task_2)
-            session.add(task_3)
-            session.commit() 
-        else:
-            taskx= Tasks(title= titlex, done= donex)
-            session.add(taskx)
+            new_task= Tasks(id= task.id,title= task.title,done=task.done)
+            session.add(new_task)
             session.commit()
-            task = session.get(Tasks, taskx.id)
-            return task
+            task_result= session.get(Tasks, new_task.id)
+            return task_result
         
 def count_rows():
     with Session(engine) as session:
-        statement= select(Tasks)
-        results = session.exec(statement).all()
-        
-        if len(results) == 0:
-            create_tasks()
+        if session.exec(select(Tasks)).first() is None:
+            session.add_all(
+                [
+                    Tasks(id=1,title="untitled task 1"),
+                    Tasks(id=2,title="untitled task 2"),
+                    Tasks(id=3,title="untitled task 3")
+                ]
+            )
+            session.commit()
 
 def list_tasks(id : int | None = None):
     with Session(engine) as session:
@@ -49,7 +43,7 @@ def list_tasks(id : int | None = None):
             result = session.exec(statement)
             return (result.one())
         if id is None:
-            objects = session.exec(select(Tasks))
+            objects = session.exec(select(Tasks).order_by(Tasks.id))
             return (objects.all())
 
 def update_tasks(id:int,title:str|None=None, done:bool|None=None):
